@@ -3,48 +3,47 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const app = express();
 
-// Middleware
 app.use(cors());
 app.use(express.json());
 
-// MongoDB Connection
-mongoose.connect('mongodb://localhost:27017/chickengram', {
-    useNewUrlParser: true,
-    useUnifiedTopology: true
-}).then(() => console.log('MongoDB connected 🧠'))
-  .catch(err => console.error('MongoDB connection error:', err));
+mongoose.connect('mongodb://localhost:27017/pollingDB', {
+  useNewUrlParser: true, useUnifiedTopology: true
+})
+.then(() => console.log('✅ MongoDB connected'))
+.catch(err => console.error(err));
 
-// Models
-const User = mongoose.model('User', new mongoose.Schema({
-    username: String,
-    age: Number
-}));
+const pollSchema = new mongoose.Schema({
+  question: String,
+  options: [{ text: String, votes: { type: Number, default: 0 } }]
+});
+const Poll = mongoose.model('Poll', pollSchema);
 
-const Tweet = mongoose.model('Tweet', new mongoose.Schema({
-    text: String,
-    likes: Number,
-    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
-}));
-
-// Routes
-app.post('/api/users', async (req, res) => {
-    const user = new User(req.body);
-    await user.save();
-    res.json(user);
+app.get('/api/polls', async (req, res) => {
+  const polls = await Poll.find();
+  res.json(polls);
 });
 
-app.post('/api/tweets', async (req, res) => {
-    const { text, likes, userId } = req.body;
-    const tweet = new Tweet({ text, likes, user: userId });
-    await tweet.save();
-    res.json(tweet);
+app.post('/api/polls', async (req, res) => {
+  const poll = new Poll(req.body);
+  await poll.save();
+  res.status(201).json(poll);
 });
 
-app.get('/api/tweets', async (req, res) => {
-    const tweets = await Tweet.find().populate('user');
-    res.json(tweets);
+app.put('/api/polls/:id/vote/:optionIndex', async (req, res) => {
+  const { id, optionIndex } = req.params;
+  const poll = await Poll.findById(id);
+  if (poll && poll.options[optionIndex]) {
+    poll.options[optionIndex].votes++;
+    await poll.save();
+    res.json(poll);
+  } else {
+    res.status(404).json({ error: "not found" });
+  }
 });
 
-app.listen(5000, () => {
-    console.log('Server running on http://localhost:5000 🚀');
+app.delete('/api/polls/:id', async (req, res) => {
+  await Poll.findByIdAndDelete(req.params.id);
+  res.json({ msg: 'deleted' });
 });
+
+app.listen(5000, () => console.log('🚀 Server running on port 5000'));
